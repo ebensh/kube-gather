@@ -8,7 +8,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -21,29 +20,22 @@ import (
 
 func main() {
 	// Parse command-line arguments
-	resourcesArg := flag.String("resources", "", "Comma-delimited list of namespace:resourceType:resourceName")
+	resourcesArg := flag.String("resources", "", "List (one per line) of namespace:resourceType:resourceName")
 	dbFile := flag.String("db", "kube_data.db", "Path to the SQLite database file")
 	flag.Parse()
 
 	if *resourcesArg == "" {
 		log.Fatalf("No resources provided. Use the --resources flag to specify resources.")
 	}
+	resources := strings.Split(*resourcesArg, "\n")
 
-	resources := strings.Split(*resourcesArg, ",")
-
-	// Load kubeconfig from environment
-	kubeconfig := os.Getenv("KUBECONFIG")
-	if kubeconfig == "" {
-		log.Fatalf("KUBECONFIG environment variable is not set")
-	}
-
-	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	clientConfig, err := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(clientcmd.NewDefaultClientConfigLoadingRules(), &clientcmd.ConfigOverrides{}).ClientConfig()
 	if err != nil {
-		log.Fatalf("Error building kubeconfig: %v", err)
+		log.Fatalf("Error loading kube client config: %v", err)
 	}
 
 	// Create Kubernetes client
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(clientConfig)
 	if err != nil {
 		log.Fatalf("Error creating Kubernetes client: %v", err)
 	}
@@ -181,7 +173,7 @@ func processDeployment(clientset *kubernetes.Clientset, db *sql.DB, namespace, n
 	}
 
 	processDeploymentLogs(clientset, db, namespace, name, deploymentID)
-	linkDependentResources(clientset, db, namespace, deployment, deploymentID)
+	//linkDependentResources(db, namespace, deployment, deploymentID)
 }
 
 func processDeploymentLogs(clientset *kubernetes.Clientset, db *sql.DB, namespace, deploymentName string, deploymentID int64) {
@@ -281,3 +273,16 @@ func processSecret(clientset *kubernetes.Clientset, db *sql.DB, namespace, name 
 	// TODO: Link to dependent deployments if applicable
 	fmt.Printf("Secret %s/%s processed and stored with ID %d\n", namespace, name, secretID)
 }
+
+// func linkDependentResources(db *sql.DB, deploymentID int64, resourceType string, resourceID int64) {
+// 	_, err := db.Exec(`
+// 		INSERT INTO deployment_dependencies (deployment_id, resource_type, resource_id)
+// 		VALUES (?, ?, ?)
+// 	`, deploymentID, resourceType, resourceID)
+// 	if err != nil {
+// 		log.Printf("Error linking dependent resource (type: %s, id: %d) to deployment (id: %d): %v\n",
+// 			resourceType, resourceID, deploymentID, err)
+// 	} else {
+// 		fmt.Printf("Linked %s (ID %d) to Deployment ID %d\n", resourceType, resourceID, deploymentID)
+// 	}
+// }

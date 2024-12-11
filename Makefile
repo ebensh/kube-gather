@@ -1,9 +1,11 @@
 APP_NAME := kube-query
 GO_FILES := main.go
-OUTPUT := $(APP_NAME)
-DB_FILE := kube_data.db
-RESOURCES := "default:deployment:example-deployment,default:configmap:example-configmap,default:secret:example-secret"
-KUBECONFIG := $(HOME)/.kube/config
+OUTPUT := bin/$(APP_NAME)
+DB_FILE := out/kube_data.db
+define RESOURCES
+rhacs:deployment:fleetshard-sync
+endef
+export RESOURCES
 
 # Commands
 .PHONY: all build run clean db-clean help
@@ -16,6 +18,7 @@ build:
 
 run: build
 	@echo "Running $(APP_NAME)..."
+	export RESOURCES
 	./$(OUTPUT) --db $(DB_FILE) --resources $(RESOURCES)
 
 clean:
